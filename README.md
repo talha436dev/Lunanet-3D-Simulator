@@ -48,7 +48,7 @@ The simulator is built entirely on web standards using a highly decoupled, three
 ├── lunarSatellites.js        # Config: Orbital elements for cislunar constellation assets
 ├── groundStation.js          # Config: Geographical and baseline tracking station vectors
 └── lunarSurface.js           # Config: Coordinates for localized surface bases and mobile rovers
-
+```
 Installation & Quick Start
 The software is completely web-native and execution requires no compiler, bundler, or backend server infrastructure.
 
@@ -76,7 +76,9 @@ Camera Focus Toggles: Use the left control HUD panel to click "Focus Earth" or "
 
 2. On-the-Fly Mesh Network Modification
 Dynamic Node Deployment: Click the + Add Moon Base option button on the dashboard interface.
-
+<p align="center">
+  <img src="simulation_gif2.gif" alt="LunaNet Fault Injection Simulation Demo" width="750">
+</p>
 Surface Placement: Move your cursor over the 3D rendering of the Moon and left-click on any surface location. The simulation will instantly instantiate a new ground asset, link it into the live topological array, and dynamically include it in routing calculations.
 
 3. Stress Testing via Chaos Injection

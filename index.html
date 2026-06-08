@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>LunaNet Mission Control</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    
+    <script src="earthSatellites.js"></script>
+    <script src="groundStation.js"></script>
+    <script src="lunarSatellites.js"></script>
+    <script src="lunanetNetwork.js"></script>
+    <script src="lunarSurface.js"></script> 
+    
+    <style>
+        #cesiumContainer { width: 100%; height: 100vh; margin: 0; background: #000; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #nav-menu {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(10, 10, 10, 0.95); padding: 20px; border-radius: 10px;
+            color: white; border: 1px solid #00ff00; width: 220px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+        }
+        .header { 
+            font-size: 16px; font-weight: bold; color: #00ff00; margin-bottom: 15px;
+            border-bottom: 1px solid #333; padding-bottom: 5px; text-transform: uppercase;
+            letter-spacing: 2px; 
+        }
+        select { 
+            background: #000; color: #00ff00; padding: 10px; border: 1px solid #00ff00;
+            width: 100%; cursor: pointer; outline: none; margin-bottom: 10px;
+        }
+        .deploy-btn { 
+            background: #000; color: #00ff00; border: 1px solid #00ff00;
+            width: 100%; padding: 10px; cursor: pointer; font-family: monospace; font-weight: bold;
+            margin-top: 5px; text-transform: uppercase; transition: 0.3s; 
+        }
+        .deploy-btn:hover { background: #00ff00; color: #000; }
+        
+        .chaos-section {
+            margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ff3333;
+        }
+        .chaos-header {
+            font-size: 11px; font-weight: bold; color: #ff3333; letter-spacing: 1.5px;
+            text-transform: uppercase; margin-bottom: 10px; font-family: monospace;
+        }
+        .chaos-label {
+            display: flex; align-items: center; font-size: 11px; color: #ff9999;
+            margin-bottom: 8px; cursor: pointer; font-family: monospace;
+        }
+        .chaos-label input { margin-right: 8px; cursor: pointer; }
+
+        .algo-section {
+            margin-top: 10px; padding-top: 10px; border-top: 1px dashed #00ff00;
+        }
+        .algo-header {
+            font-size: 11px; font-weight: bold; color: #00ff00; letter-spacing: 1.5px;
+            text-transform: uppercase; margin-bottom: 8px; font-family: monospace;
+        }
+
+        #gs-dashboard {
+            position: absolute; top: 20px; right: 20px; width: 440px; 
+            max-height: 90vh; overflow-y: auto;
+            background: rgba(5, 5, 5, 0.95); border: 1px solid #00ff00; color: #00ff00; 
+            padding: 15px; z-index: 2000; font-family: 'Courier New', monospace; 
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.3); border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .analytics-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+            margin-bottom: 8px; text-align: center;
+        }
+        .analytics-box {
+            background: rgba(255,255,255,0.03); padding: 4px; border: 1px solid #222; border-radius: 2px;
+        }
+        .analytics-label { font-size: 9px; color: #888; text-transform: uppercase; margin-bottom: 2px;}
+        .analytics-val { font-size: 14px; font-weight: bold; }
+
+        .pdr-container {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,255,255,0.03); border: 1px solid #113333;
+            padding: 6px 10px; border-radius: 2px; margin-top: 5px;
+        }
+
+        #gs-dashboard::-webkit-scrollbar { width: 4px; }
+        #gs-dashboard::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        #gs-dashboard::-webkit-scrollbar-thumb { background: #00ff00; border-radius: 2px; }
+
+        .packet-stream-box {
+            max-height: 200px; overflow-y: auto; border: 1px solid #111; 
+            background: rgba(0,0,0,0.3); padding: 6px; border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="nav-menu">
+        <div class="header">LunaNet v1.0</div>
+        
+        <div class="algo-header">Location View</div>
+        <select id="location-dropdown" onchange="navigateTo(this.value)">
+            <option value="system">Deep Space View</option>
+            <option value="earth">Earth Station (Pakistan)</option>
+            <option value="moon">Lunar Node (Orbiting)</option>
+        </select>
+        
+
+        <div class="algo-section">
+            <div class="algo-header">Routing Engine</div>
+            <select id="routing-algo-dropdown" onchange="window.currentRoutingAlgorithm = this.value">
+                <option value="greedy">Greedy / Hierarchical</option>
+                <option value="cgr">Contact Graph (CGR Plan)</option>
+            </select>
+        </div>
+
+        <button id="deploy-base-btn" class="deploy-btn" onclick="window.togglePlacementMode()">+ Add Moon Base</button>
+        <div id="placement-status" style="display: none; font-size: 10px; color:#ffff00; margin-top:5px; text-align:center;">[MODE: CLICK MOON SURFACE]</div>
+        
+        <div class="chaos-section">
+            <div class="chaos-header">⚠️ Fault Injection</div>
+            <label class="chaos-label">
+                <input type="checkbox" id="solar-flare-chk" onchange="window.isSolarStormActive = this.checked">
+                Solar Flare (40% Loss)
+            </label>
+            <label class="chaos-label">
+                <input type="checkbox" id="blackout-chk" onchange="window.isHardwareBlackoutActive = this.checked">
+                Hardware Blackout
+            </label>
+        </div>
+    </div>
+
+    <div id="gs-dashboard">
+        <div style="display: flex; justify-content:space-between; border-bottom:2px solid #00ff00; margin-bottom: 12px; padding-bottom:5px;">
+            <span style="font-weight:bold; letter-spacing:1px; font-size:12px;">GS-PAKISTAN MISSION CONTROL</span>
+            <button onclick="document.getElementById('gs-dashboard').style.display='none'" style="background:none; color:#00ff00; border:1px solid #00ff00; cursor:pointer; padding: 0 6px; font-weight:bold; font-size: 10px;">X</button>
+        </div>
+        
+        <div style="font-size: 10px; font-weight: bold; color: #00ff00; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;">Node Buffer Storage Capacities:</div>
+        <div id="buffer-graph-telemetry" style="margin-bottom: 14px; background: rgba(0,0,0,0.5); padding: 8px; border: 1px solid #222; border-radius: 2px;"></div>
+
+        <div style="font-size: 10px; font-weight: bold; color: #00ffff; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;">Mission Routing Analytics:</div>
+        <div id="efficiency-analytics-card" style="margin-bottom: 14px;">
+            <div class="analytics-grid">
+                <div class="analytics-box">
+                    <div class="analytics-label">Generated</div>
+                    <div id="stat-gen" class="analytics-val" style="color: #00ffff;">0</div>
+                </div>
+                <div class="analytics-box">
+                    <div class="analytics-label">Delivered</div>
+                    <div id="stat-del" class="analytics-val" style="color: #00ff00;">0</div>
+                </div>
+                <div class="analytics-box">
+                    <div class="analytics-label">Dropped</div>
+                    <div id="stat-drp" class="analytics-val" style="color: #ff3333;">0</div>
+                </div>
+            </div>
+            <div class="pdr-container">
+                <span style="font-size: 10px; text-transform: uppercase; color: #aaa;">Packet Delivery Ratio (PDR):</span>
+                <span id="stat-pdr" style="font-weight: bold; font-size: 14px; color: #ffff00;">100.0%</span>
+            </div>
+        </div>
+
+        <div style="font-size: 10px; font-weight: bold; color: #00ff00; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;">Live Incoming Packet Logs:</div>
+        <div class="packet-stream-box">
+            <div id="dashboard-content"></div>
+        </div>
+        <div style="font-size:9px; color:#444; margin-top:10px; text-align:center;">--- DOUBLE-CLICK STATION TO TOGGLE ---</div>
+    </div>
+
+    <div id="cesiumContainer"></div>
+
+    <script>
+    
+    
+        window.currentRoutingAlgorithm = "greedy"; 
+        window.isSolarStormActive = false;
+        window.isHardwareBlackoutActive = false;
+
+        window.statsGenerated = 0;
+        window.statsDelivered = 0;
+        window.statsDropped = 0;
+
+        // FIXED: Restored original valid token string signature
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNWM1MmY0ZC1lOTIyLTQxNjQtODhlYy05OTk1ZTVkODNiNDAiLCJpZCI6NDI1OTIwLCJpYXQiOjE3Nzc1ODAyNzF9.UV6G1msQEeGjbA9zLl0DTDAs9Jiic15Qf8ixDm7N1HU';
+        
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            baseLayerPicker: false,
+            geocoder: false,
+            selectionIndicator: false,
+            infoBox: false,
+            navigationHelpButton: false,
+            sceneModePicker: false
+        });
+
+        const now = Cesium.JulianDate.fromDate(new Date());
+        viewer.clock.currentTime = now;
+        viewer.clock.shouldAnimate = true;
+        viewer.clock.multiplier = 1;
+        viewer.scene.globe.enableLighting = true;
+        viewer.scene.light = new Cesium.SunLight();
+        viewer.shadows = true;
+        viewer.scene.ambientLightColor = new Cesium.Color(0.2, 0.2, 0.2, 1.0);
+        viewer.scene.camera.frustum.near = 1000.0;
+        viewer.scene.camera.frustum.far = 5.0e11;
+
+        const moonDistance = 384400000;
+        const moonOrbitSpeed = 0.0000026;
+
+        const moonPositionProperty = new Cesium.CallbackProperty((time) => {
+            const seconds = Cesium.JulianDate.secondsDifference(time, now);
+            const angle = seconds * moonOrbitSpeed;
+            return new Cesium.Cartesian3(moonDistance * Math.cos(angle), moonDistance * Math.sin(angle), 0);
+        }, false);
+
+        async function loadMoon() {
+            try {
+                const moonTileset = await Cesium.Cesium3DTileset.fromIonAssetId(2684829);
+                viewer.scene.primitives.add(moonTileset);
+                
+                viewer.scene.postUpdate.addEventListener(() => {
+                    const currentTime = viewer.clock.currentTime;
+                    const currentPos = moonPositionProperty.getValue(currentTime);
+                    if (currentPos) {
+                        moonTileset.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(currentPos);
+                    }
+                });
+            } catch (error) { 
+                console.error("Moon tileset failed to load:", error); 
+            }
+        }
+        loadMoon();
+
+        const moonMarker = viewer.entities.add({
+            name: "Lunar Node",
+            position: moonPositionProperty,
+            label: {
+                text: "LUNAR-NODE", font: "12pt monospace", fillColor: Cesium.Color.LIME,
+                pixelOffset: new Cesium.Cartesian2(0, -50), showBackground: true,
+                backgroundColor: new Cesium.Color(0, 0, 0, 0.9),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY
+            }
+        });
+
+        const orbitPoints = [];
+        for (let i = 0; i <= 360; i++) {
+            const radians = Cesium.Math.toRadians(i);
+            orbitPoints.push(new Cesium.Cartesian3(moonDistance * Math.cos(radians), moonDistance * Math.sin(radians), 0));
+        }
+        viewer.entities.add({ 
+            polyline: { 
+                positions: orbitPoints, 
+                width: 1, 
+                material: new Cesium.PolylineDashMaterialProperty({ color: Cesium.Color.LIME.withAlpha(0.3) }) 
+            } 
+        });
+
+        var dynamicBundleRouteMap = {};
+
+        function navigateTo(target) {
+            viewer.trackedEntity = undefined;
+            viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+            if (target === 'moon') {
+                viewer.trackedEntity = moonMarker;
+            } else if (target === 'earth') {
+                viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(69.34, 30.37, 15000000), duration: 2 });
+            } else {
+                viewer.camera.flyTo({
+                    destination: new Cesium.Cartesian3(600000000, 600000000, 400000000),
+                    orientation: { heading: Cesium.Math.toRadians(225), pitch: Cesium.Math.toRadians(-35), roll: 0.0 },
+                    duration: 3
+                });
+            }
+        }
+
+        // Initialize separate modular files
+        if (typeof setupEarthGateway === 'function') setupEarthGateway(viewer);
+        if (typeof setupGroundStation === 'function') setupGroundStation(viewer);
+        if (typeof setupLunarNetwork === 'function') setupLunarNetwork(viewer, moonPositionProperty);
+        if (typeof setupLunarSurface === 'function') setupLunarSurface(viewer, moonPositionProperty);
+
+        // Consolidated Master Simulation Loop running on each frame tick update
+        viewer.clock.onTick.addEventListener(function(clock) {
+            if (typeof updateLunanetNetwork === 'function') {
+                updateLunanetNetwork(viewer, moonPositionProperty);
+            }
+            if (typeof processDtnNetworkTransits === 'function') {
+                processDtnNetworkTransits(viewer);
+            }
+            if (typeof refreshDashboard === 'function') {
+                refreshDashboard(viewer);
+            }
+            
+            renderBufferDashboardGraphs();
+            updateHistoricalAnalyticsUI();
+            appendRouteTracesDirectly();
+        });
+
+        function renderBufferDashboardGraphs() {
+            let graphDiv = document.getElementById("buffer-graph-telemetry");
+            if (!graphDiv) return;
+
+            const targetNodes = ["DRO-1", "DRO-2", "HALO-L1", "HALO-L2", "HALO-POLAR", "GEO-GATEWAY-ALPHA"];
+            let compiledHtml = "";
+
+            targetNodes.forEach(node => {
+                let currentCount = dtnNodeHardDrives[node] ? dtnNodeHardDrives[node].length : 0;
+                let usagePercent = Math.round((currentCount / MAX_BUFFER_CAPACITY) * 100);
+                
+                let barBlocksCount = currentCount; 
+                let emptyBlocksCount = MAX_BUFFER_CAPACITY - barBlocksCount;
+                let barString = "█".repeat(barBlocksCount) + "░".repeat(emptyBlocksCount);
+
+                let statusColor = "#00ffff"; 
+                if (usagePercent >= 80) statusColor = "#ff3333"; 
+                else if (usagePercent >= 50) statusColor = "#ffff00"; 
+
+                compiledHtml += `<div style="margin-bottom: 4px; font-size:10px; display:flex; justify-content:space-between;">
+                    <span style="color:#ffffff; font-weight:bold;">${node.padEnd(16, '.')}</span>
+                    <span style="color:${statusColor}; font-family:monospace; letter-spacing:1px;">[${barString}] ${usagePercent}%</span> 
+                    <span style="color:#888; font-size:9px; width:35px; text-align:right;">(${currentCount}/${MAX_BUFFER_CAPACITY})</span>
+                </div>`;
+            });
+
+            graphDiv.innerHTML = compiledHtml;
+        }
+
+        function updateHistoricalAnalyticsUI() {
+            let genEl = document.getElementById("stat-gen");
+            let delEl = document.getElementById("stat-del");
+            let drpEl = document.getElementById("stat-drp");
+            let pdrEl = document.getElementById("stat-pdr");
+
+            if (genEl) genEl.innerText = window.statsGenerated;
+            if (delEl) delEl.innerText = window.statsDelivered;
+            if (drpEl) drpEl.innerText = window.statsDropped;
+            
+            if (pdrEl) {
+                if (window.statsGenerated > 0) {
+                    let pdr = (window.statsDelivered / window.statsGenerated) * 100;
+                    pdrEl.innerText = pdr.toFixed(1) + "%";
+                    
+                    if (pdr >= 85) pdrEl.style.color = "#00ff00";
+                    else if (pdr >= 50) pdrEl.style.color = "#ffff00";
+                    else pdrEl.style.color = "#ff3333";
+                } else {
+                    pdrEl.innerText = "100.0%";
+                    pdrEl.style.color = "#ffff00";
+                }
+            }
+        }
+
+        function appendRouteTracesDirectly() {
+            let contentDiv = document.getElementById("dashboard-content");
+            if (!contentDiv || !contentDiv.innerHTML) return;
+            let currentHtml = contentDiv.innerHTML;
+
+            for (let bundleId in dynamicBundleRouteMap) {
+                if (currentHtml.includes(bundleId)) {
+                    let metricsIndex = currentHtml.indexOf("Metrics:", currentHtml.indexOf(bundleId));
+                    if (metricsIndex !== -1) {
+                        let nextBreakIndex = currentHtml.indexOf("<br>", metricsIndex);
+                        if (nextBreakIndex !== -1) {
+                            let lineSegment = currentHtml.substring(metricsIndex, nextBreakIndex);
+                            if (!lineSegment.includes(" , Route:")) {
+                                let customRouteInsert = `<br>&nbsp; <span style="color: #00ffff; font-weight: bold;">Route:</span> <span style="color: #ffffff; background: rgba(0,255,255,0.1); padding: 1px 4px; border-radius: 2px;">${dynamicBundleRouteMap[bundleId]}</span>`;
+                                currentHtml = currentHtml.substring(0, nextBreakIndex) + customRouteInsert + currentHtml.substring(nextBreakIndex);
+                            }
+                        }
+                    }
+                }
+            }
+            contentDiv.innerHTML = currentHtml;
+        }
+
+        window.triggerRoverDeployment = function(baseId) {
+            if (typeof window.deployRover === 'function') {
+                window.deployRover(viewer, baseId, moonPositionProperty);
+            }
+        };
+
+        if (typeof initDashboardSelector === 'function') {
+            initDashboardSelector(viewer);
+        }
+
+        // --- DTN PACKET ROUTING CORE ENGINE ---
+        const MAX_BUFFER_CAPACITY = 5; 
+
+        var dtnNodeHardDrives = {
+            "GROUND-STATION-PAKISTAN": [],
+            "GEO-GATEWAY-ALPHA": [], 
+            "GEO-GATEWAY-BRAVO": [], 
+            "GEO-GATEWAY-CHARLIE": [],
+            "HALO-L1": [], 
+            "HALO-L2": [], 
+            "HALO-POLAR": [], 
+            "DRO-1": [], 
+            "DRO-2": []
+        };
+
+        const CONTACT_GRAPH_PLAN = [
+            { "from": "DRO-1", "to": "HALO-POLAR", "start": 0, "end": 40 },
+            { "from": "DRO-1", "to": "HALO-L1", "start": 41, "end": 90 },
+            { "from": "HALO-POLAR", "to": "GEO-GATEWAY-ALPHA", "start": 0, "end": 60 },
+            { "from": "HALO-L1", "to": "GEO-GATEWAY-BRAVO", "start": 30, "end": 120 },
+            { "from": "GEO-GATEWAY-ALPHA", "to": "GROUND-STATION-PAKISTAN", "start": 0, "end": 200 },
+            { "from": "GEO-GATEWAY-BRAVO", "to": "GROUND-STATION-PAKISTAN", "start": 0, "end": 200 }
+        ];
+
+        class DtnBundlePacket {
+            constructor(bundleId, sourceId, destinationId, payloadSizeMb, classOfService = 1) {
+                this.id = bundleId;
+                this.source = sourceId;
+                this.destination = destinationId;
+                this.sizeMb = payloadSizeMb;
+                this.creationTimestamp = new Date().toLocaleTimeString();
+                this.currentHolder = sourceId;
+                this.hopHistory = [sourceId];
+                this.classOfService = classOfService; 
+            }
+        }
+
+        function pushToDtnNodeStorage(nodeId, packet) {
+            let targetDrive = dtnNodeHardDrives[nodeId];
+            if (!targetDrive) return false;
+
+            if (targetDrive.length < MAX_BUFFER_CAPACITY) {
+                targetDrive.push(packet);
+                return true;
+            }
+
+            let lowestPriorityInQueue = Math.min(...targetDrive.map(p => p.classOfService));
+
+            if (packet.classOfService > lowestPriorityInQueue) {
+                let dropIndex = targetDrive.findIndex(p => p.classOfService === lowestPriorityInQueue);
+                if (dropIndex !== -1) {
+                    let droppedPacket = targetDrive.splice(dropIndex, 1)[0];
+                    window.statsDropped++; 
+                    
+                    const labelMap = ["Bulk", "Standard", "Critical"];
+                    console.warn(`%c[BUFFER OVERFLOW - DROP POLICY]: Node ${nodeId} drive full. Dropping older ${droppedPacket.id} (Priority: ${labelMap[droppedPacket.classOfService]}) to allocate slot for incoming ${packet.id} (Priority: ${labelMap[packet.classOfService]}).`, "color: #ff4500; font-weight: bold;");
+                    
+                    targetDrive.push(packet);
+                    return true;
+                }
+            }
+
+            window.statsDropped++; 
+            const labelMap = ["Bulk", "Standard", "Critical"];
+            console.error(`%c[BUFFER OVERFLOW - REJECTED]: Node ${nodeId} drive full. Incoming packet ${packet.id} (${labelMap[packet.classOfService]}) dropped via Drop-Tail threshold.`, "color: #ff0000; font-weight: bold;");
+            return false;
+        }
+
+        function injectMockTelemetryBundle() {
+            window.statsGenerated++; 
+            const prioritySelection = Math.floor(Math.random() * 3);
+            let freshBundle = new DtnBundlePacket(
+                `LUNANET_PKT_${Math.floor(Math.random() * 9000) + 1000}`,
+                "DRO-1",
+                "GROUND-STATION-PAKISTAN",
+                50,
+                prioritySelection
+            );
+            pushToDtnNodeStorage("DRO-1", freshBundle);
+        }
+
+        function processDtnNetworkTransits(viewer) {
+            const nodes = ["GROUND-STATION-PAKISTAN", "GEO-GATEWAY-ALPHA", "GEO-GATEWAY-BRAVO", "GEO-GATEWAY-CHARLIE", "HALO-L1", "HALO-L2", "HALO-POLAR", "DRO-1", "DRO-2"];
+            
+            nodes.forEach(nodeId => {
+                let storageBuffer = dtnNodeHardDrives[nodeId];
+                if (!storageBuffer || storageBuffer.length === 0) return;
+
+                storageBuffer.sort((a, b) => a.classOfService - b.classOfService);
+
+                for (let i = storageBuffer.length - 1; i >= 0; i--) {
+                    let bundle = storageBuffer[i];
+                    
+                    if (nodeId === bundle.destination) {
+                        window.statsDelivered++; 
+                        const labelMap = ["Bulk", "Standard", "Critical"];
+                        console.log(`%c[MISSION CONTROL ARRIVAL]: ${bundle.id} (Priority: ${labelMap[bundle.classOfService]}) delivered! Route: ${bundle.hopHistory.join(" ➔ ")}`, "color: #00ff00; font-weight: bold; font-size: 13px;");
+                        
+                        let trackingHistory = bundle.hopHistory.map(hop => {
+                            if (hop === "GROUND-STATION-PAKISTAN") return "GS-PAKISTAN";
+                            if (hop.includes("GEO-GATEWAY-")) return hop.replace("GEO-GATEWAY-", "GEO-");
+                            return hop;
+                        });
+
+                        const algoTag = window.currentRoutingAlgorithm === "cgr" ? " [CGR]" : " [Greedy]";
+                        dynamicBundleRouteMap[bundle.id] = trackingHistory.join(" ➔ ") + ` [${labelMap[bundle.classOfService]}]` + algoTag;
+                        storageBuffer.splice(i, 1);
+                        continue;
+                    }
+
+                    let nextHopTargetId = findDtnNextHopRoute(nodeId, bundle.destination);
+                    if (nextHopTargetId) {
+                        let packetClone = Object.assign(Object.create(Object.getPrototypeOf(bundle)), bundle);
+                        packetClone.currentHolder = nextHopTargetId;
+                        packetClone.hopHistory.push(nextHopTargetId);
+
+                        if (pushToDtnNodeStorage(nextHopTargetId, packetClone)) {
+                            storageBuffer.splice(i, 1);
+                            const labelMap = ["Bulk", "Standard", "Critical"];
+                            console.log(`[DTN Handoff]: ${bundle.id} (${labelMap[bundle.classOfService]}) forwarded from ${nodeId} ➔ ${nextHopTargetId}`);
+                        }
+                    }
+                }
+            });
+        }
+
+        function findDtnNextHopRoute(source, destination) {
+            if (window.currentRoutingAlgorithm === "cgr") {
+                const elapsedSeconds = Math.floor(Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, now)) % 200;
+                for (let contact of CONTACT_GRAPH_PLAN) {
+                    if (contact.from === source && elapsedSeconds >= contact.start && elapsedSeconds <= contact.end) {
+                        if (verifyLiveMeshLink(source, contact.to)) {
+                            return contact.to;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            if (verifyLiveMeshLink(source, destination)) return destination;
+            const targetHierarchy = ["GROUND-STATION-PAKISTAN", "GEO-GATEWAY-ALPHA", "GEO-GATEWAY-BRAVO", "GEO-GATEWAY-CHARLIE", "HALO-L1", "HALO-L2", "HALO-POLAR"];
+            for (let priorityTarget of targetHierarchy) {
+                if (source !== priorityTarget && verifyLiveMeshLink(source, priorityTarget)) {
+                    return priorityTarget;
+                }
+            }
+            return null;
+        }
+
+        function verifyLiveMeshLink(nodeA, nodeB) {
+            if (window.isHardwareBlackoutActive) {
+                const deepSpaceNodes = ["HALO-L1", "HALO-L2", "HALO-POLAR", "DRO-1", "DRO-2", "GEO-GATEWAY-ALPHA", "GEO-GATEWAY-BRAVO", "GEO-GATEWAY-CHARLIE"];
+                if (deepSpaceNodes.includes(nodeA) || deepSpaceNodes.includes(nodeB)) {
+                    return false; 
+                }
+            }
+
+            if (window.isSolarStormActive) {
+                if (Math.random() < 0.40) {
+                    return false; 
+                }
+            }
+
+            if (typeof activeLines === 'undefined') return false;
+            let key1 = `${nodeA}_to_${nodeB}`;
+            let key2 = `${nodeB}_to_${nodeA}`;
+            let key3 = `BRIDGE_${nodeA}`;
+            let key4 = `BRIDGE_${nodeB}`;
+            let key5 = `LUN_A_${nodeA}`;
+            let key6 = `LUN_B_${nodeA}`;
+
+            if ((nodeA === "GROUND-STATION-PAKISTAN" && nodeB === "GEO-GATEWAY-ALPHA") || 
+                (nodeB === "GROUND-STATION-PAKISTAN" && nodeA === "GEO-GATEWAY-ALPHA")) {
+                if (activeLines["RADIO_UPLINK"] && activeLines["RADIO_UPLINK"].show) return true;
+            }
+            if (activeLines[key1] && activeLines[key1].show) return true;
+            if (activeLines[key2] && activeLines[key2].show) return true;
+            if (activeLines[key3] && activeLines[key3].show && key3.includes(nodeB)) return true;
+            if (activeLines[key4] && activeLines[key4].show && key4.includes(nodeA)) return true;
+            if (activeLines[key5] && activeLines[key5].show) return true;
+            if (activeLines[key6] && activeLines[key6].show) return true;
+
+            if (activeLines["GEO_M1"] && ((nodeA === "GEO-GATEWAY-ALPHA" && nodeB === "GEO-GATEWAY-BRAVO") || (nodeA === "GEO-GATEWAY-BRAVO" && nodeB === "GEO-GATEWAY-ALPHA"))) return true;
+            if (activeLines["GEO_M2"] && ((nodeA === "GEO-GATEWAY-BRAVO" && nodeB === "GEO-GATEWAY-CHARLIE") || (nodeA === "GEO-GATEWAY-CHARLIE" && nodeB === "GEO-GATEWAY-BRAVO"))) return true;
+            if (activeLines["GEO_M3"] && ((nodeA === "GEO-GATEWAY-CHARLIE" && nodeB === "GEO-GATEWAY-ALPHA") || (nodeA === "GEO-GATEWAY-ALPHA" && nodeB === "GEO-GATEWAY-CHARLIE"))) return true;
+            return false;
+        }
+
+        setInterval(injectMockTelemetryBundle, 3000); 
+    </script>
+</body>
+</html>

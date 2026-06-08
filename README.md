@@ -2,6 +2,10 @@
 
 A high-fidelity, web-native 3D Space Communications Digital Twin and Delay-Tolerant Networking (DTN) simulator. This platform models dynamic Earth-Moon orbital mechanics, lunar terrain horizon masking, and automated tracking handovers for satellites, mobile rovers, and surface assets in real time. 
 
+<p align="center">
+  <img src="simulation_gif1.gif" alt="LunaNet Fault Injection Simulation Demo" width="750">
+</p>
+
 Operating over the physical astrodynamics layer is a custom implementation of the **DTN Bundle Protocol stack (RFC 5050 / RFC 9171)** designed to handle multi-second propagation delays and frequent line-of-sight blockages from planetary orbital occlusions.
 
 ---

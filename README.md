@@ -66,7 +66,7 @@ Navigate to the folder and open welcome.html directly in your web browser (or us
 
 To customize default positions, coordinate frames, or node properties, modify the JavaScript files inside the respective configuration files.
 
-#vHow to Use & Simulation Interaction Guide
+# How to Use & Simulation Interaction Guide
 Once the Mission Control HUD loads in your browser, use the following control workflows to interact with and analyze the network:
 
 1. Viewport Navigation

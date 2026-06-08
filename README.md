@@ -60,13 +60,13 @@ Browser: Any modern web browser supporting WebGL hardware acceleration (Chrome, 
 Deployment Steps
 
 Clone or download this repository into a local directory:
-git clone [https://github.com/talha436dev/LunaNet-Simulator.git](https://github.com/yourusername/LunaNet-Simulator.git)
+git clone [https://github.com/talha436dev/Lunanet-3D-Simulator](https://github.com/yourusername/LunaNet-3D-Simulator.git)
 
 Navigate to the folder and open welcome.html directly in your web browser (or use a lightweight IDE extension like VS Code's Live Server).
 
 To customize default positions, coordinate frames, or node properties, modify the JavaScript files inside the respective configuration files.
 
-How to Use & Simulation Interaction Guide
+#vHow to Use & Simulation Interaction Guide
 Once the Mission Control HUD loads in your browser, use the following control workflows to interact with and analyze the network:
 
 1. Viewport Navigation

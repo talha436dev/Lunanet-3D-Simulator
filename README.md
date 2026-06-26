@@ -1,101 +1,204 @@
-# LunaNet Extended Mission Control: 3D Space Communications Simulator
+# LunaNet 3D Mission Control — Space Communications Simulator
 
-A high-fidelity, web-native 3D Space Communications Digital Twin and Delay-Tolerant Networking (DTN) simulator. This platform models dynamic Earth-Moon orbital mechanics, lunar terrain horizon masking, and automated tracking handovers for satellites, mobile rovers, and surface assets in real time. 
+<div align="center">
 
-<p align="center">
-  <img src="simulation_gif1.gif" alt="LunaNet Fault Injection Simulation Demo" width="750">
-</p>
+**A high-fidelity, web-native 3D Digital Twin and Delay-Tolerant Networking (DTN) simulator of the NASA LunaNet architecture.**
 
-Operating over the physical astrodynamics layer is a custom implementation of the **DTN Bundle Protocol stack (RFC 5050 / RFC 9171)** designed to handle multi-second propagation delays and frequent line-of-sight blockages from planetary orbital occlusions.
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Open%20Simulator-00ff00?style=for-the-badge)](https://talha436dev.github.io/Lunanet-3D-Simulator/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/talha436dev/Lunanet-3D-Simulator)
+
+</div>
 
 ---
 
-## 🚀 Features
+> Built independently by **Syed Talha Jamal**, 6th-semester Computer Engineering student at the Sir Syed University of Engineering & Technology (SSUET), Karachi, Pakistan.  
+> Developed as a self-initiated study of the NASA LunaNet Interoperability Specification and CCSDS DTN standards, with the intent of producing a research-grade, interactive tool for visualising cislunar network behaviour.
+
+---
+
+## Overview
+
+![LunaNet Mission Control — Full System View](screenshots/mission_control_overview.png)
+*Full mission control view: 3D cislunar topology with GEO gateways, HALO/DRO orbital nodes, lunar surface base, and live DTN routing dashboard*
+
+This simulator models the full Earth-Moon communication chain defined in the NASA LunaNet Architecture — from a terrestrial ground station in Pakistan through a GEO relay tier, across an interplanetary link, into a cislunar orbital mesh, and down to deployable surface bases with patrolling rovers. Every link is computed in real time against true planetary geometries.
+
+Operating over the physical layer is a custom implementation of the **DTN Bundle Protocol (RFC 9171)** — the store-and-forward networking standard that NASA uses as the core framework for LunaNet. The simulator faithfully reproduces the three-tier priority system, preemptive queue eviction, and two competing routing algorithms described in the LunaNet specification.
+
+**Standards compliance:** Architecture mapped against the NASA LunaNet Architecture Definition Document (NASA/TM–20210019864) and CCSDS Bundle Protocol Specification (RFC 9171, building on the original RFC 5050 framework).
+
+---
+
+## Demo
+
+![Fault Injection — Solar Flare & Link Disruption](simulation_gif1.gif)
+*Chaos Engineering subsystem: Solar flare packet loss injection causing link disruption and automatic rerouting*
+
+![Dynamic Moon Base Deployment](simulation_gif2.gif)
+*On-the-fly surface asset deployment: click any point on the lunar surface to instantiate a command base with 3 patrolling rovers, immediately integrated into live DTN routing*
+
+---
+
+## Features
 
 ### 1. Spatial Astrodynamics & Occlusion Engine
-* **Planetary Ephemeris Modeling:** Tracks dynamic orbital mechanics on a 3D Cartesian grid centered on Earth at origin point `[0, 0, 0]`. Updates the Moon's shifting displacement vector (P{moon}) frame-by-frame based on elapsed time.
 
-* **Rotational Transformations:** Applies a time-varying rotational transformation matrix (R_z) to map real-time coordinates of a terrestrial ground station in Pakistan (69.34° E, 30.37° N), adjusting dynamically for Earth's axis spin.
-  
-* **Ray-Traced Horizon Masking:** Continuous vector cross-product calculations check for planetary obstructions using true physical radii (R_E = 6,371 \text{ km}$ for Earth horizon masking and R_M = 1,737.4 \text{ km} for lunar surface occlusions).
-* **Lunar Polar Terrain Cutoffs:** Evaluates normalized dot-product constraints relative to the Moon’s center to cut direct links instantly when a rover slips past a visible ridge or horizon, automatically triggering an automated handover routine to look for overhead satellite relays.
+- **Planetary Ephemeris Modeling** — Tracks dynamic orbital mechanics on a 3D Cartesian grid centred on Earth at `[0, 0, 0]`. Updates the Moon's displacement vector `P(moon)` frame-by-frame using CesiumJS real-time ephemeris data.
+- **Rotational Coordinate Transforms** — Applies a time-varying rotation matrix `R_z` to map the terrestrial ground station (69.34° E, 30.37° N, Pakistan) dynamically for Earth's axial spin.
+- **Ray-Traced Horizon Masking** — Continuous vector cross-product calculations check for planetary obstructions using true physical radii: `R_E = 6,371 km` (Earth) and `R_M = 1,737.4 km` (Moon).
+- **Lunar Polar Terrain Cutoffs** — Evaluates normalised dot-product constraints relative to the Moon's centre to sever rover-to-base links the moment a rover slips past a visible ridge, triggering automatic handover to overhead orbital relays.
 
 ### 2. Delay-Tolerant Networking (DTN) Stack
-* **Store-and-Forward Caching:** Implements self-contained application data blocks ("bundles") that cache data securely in localized memory vaults when physical links go dark, treating intermittent connectivity as an expected operational state rather than an infrastructure failure.
-* **Class of Service (CoS) Prioritization:** Strict traffic profiles separating data packets into three clear priority levels matching LunaNet specifications: Critical Telemetry (Priority 2), Standard Logs (Priority 1), and Bulk Scientific Payloads (Priority 0).
-* **Preemptive Queue Eviction:** Manages hardware memory limitations with a bounded queue {MAX\_BUFFER\_CAPACITY} = 5 packets. When a packet reaches a completely full buffer, lower-priority packets are preemptively purged from the queue to guarantee delivery pathways for incoming high-priority command data.
+
+- **Store-and-Forward Bundle Caching** — Implements self-contained data blocks ("bundles") that persist in node memory vaults when physical links go dark — treating intermittent connectivity as a normal operational state, not a failure.
+- **Class of Service (CoS) Prioritisation** — Three strict traffic profiles matching LunaNet specifications:
+  - Priority 2 → Critical Telemetry (command-critical, never dropped)
+  - Priority 1 → Standard Operational Logs
+  - Priority 0 → Bulk Scientific Payloads
+- **Preemptive Queue Eviction** — Bounded queue `MAX_BUFFER_CAPACITY = 5`. When a node's buffer is full, lower-priority bundles are evicted to guarantee delivery of incoming higher-priority data. Visualised live on the HUD.
+- **Hop History Tracking** — Every bundle carries a full route trace from origin rover through each relay node to final delivery at the Pakistan ground station, with generation and transmission timestamps.
 
 ### 3. Hot-Swappable Routing Engines
-* **Greedy Hierarchical Router:** An opportunistic routing engine that handles packet transfers over immediate visible paths.
-* **Contact Graph Routing (CGR):** A schedule-aware routing engine that utilizes contact plans to navigate predictable orbital disruptions.
 
-### 4. Chaos Engineering Subsystem
-* **Solar Flare Disruption Loop:** Simulates space weather hazards by injecting a 40% random connection drop probability across active link vectors.
-* **Total Node Blackouts:** Allows operators to target and completely deactivate specific satellite relays (e.g., HALO-L1, HALO-Polar), severing all local connection links to force the network to adapt to sudden hardware failures.
+- **Greedy Hierarchical Router** — Opportunistic engine that forwards bundles over the best immediately visible path, using a fixed priority hierarchy: Ground Station → GEO Gateways → HALO nodes → DRO satellites.
+- **Contact Graph Routing (CGR)** — Schedule-aware engine that navigates predictable orbital contact windows using a pre-computed contact plan, forwarding only when a timed contact window is active and the LOS check passes. Switch between both engines live during simulation.
 
-## 🛠️ Architecture & Project Structure
+### 4. Network Topology
 
-The simulator is built entirely on web standards using a highly decoupled, three-tier topology:
-* **Spatial Astrodynamics Layer:** Manages orbital positions, coordinate frames, and 3D positioning using a synchronized WebGL rendering loop.
-* **Physical Line-of-Sight (LOS) Layer:** Dynamically handles ray-traced blocks and link state verification.
-* **Discrete Protocol Layer:** Governs store-and-forward rules, priority queues, and bundle data persistence.
+10-node Earth-Moon architecture:
 
-### File Layout
-```text
-├── Index.html                # Core Interface: Sets up DOM layout, WebGL context, & HUD engine
-├── lunanetNetwork.js         # Protocol Layer: Line-of-sight math, DTN stack, CGR, & routing rules
-├── earthSatellites.js        # Config: Initial positions and orbital parameters for Earth assets
-├── lunarSatellites.js        # Config: Orbital elements for cislunar constellation assets
-├── groundStation.js          # Config: Geographical and baseline tracking station vectors
-└── lunarSurface.js           # Config: Coordinates for localized surface bases and mobile rovers
 ```
-Installation & Quick Start
-The software is completely web-native and execution requires no compiler, bundler, or backend server infrastructure.
+Pakistan Ground Station (69.34°E, 30.37°N)
+    │
+    ├──► GEO-GATEWAY-ALPHA   (69.34°E,   35,786 km altitude)
+    ├──► GEO-GATEWAY-BRAVO   (-50.66°E,  35,786 km altitude)
+    └──► GEO-GATEWAY-CHARLIE (189.34°E,  35,786 km altitude)
+              │  [GEO Mesh Cross-Links]
+              ├──► HALO-L1     (L1 Halo Orbit,  ~35,000 km from Moon)
+              ├──► HALO-L2     (L2 Halo Orbit,  ~45,000 km from Moon)
+              ├──► HALO-POLAR  (Polar Orbit,     ~15,000 km from Moon)
+              ├──► DRO-1       (Distant Retrograde Orbit, ~60,000 km)
+              └──► DRO-2       (Distant Retrograde Orbit, ~65,000 km)
+                        │
+                        └──► [Deployable Lunar Surface Bases + Rovers]
+```
 
-Prerequisites
-Operating System: Cross-platform compatible (Windows, macOS, Linux).
+### 5. Chaos Engineering Subsystem
 
-Browser: Any modern web browser supporting WebGL hardware acceleration (Chrome, Edge, Firefox, Safari).
+- **Solar Flare Disruption** — Injects 40% random packet drop probability across all active link vectors, simulating real space weather degradation.
+- **Hardware Blackout** — Completely isolates all deep-space nodes (HALO and DRO tier), severing every link to test DTN store-and-forward resilience under total relay failure.
 
-Deployment Steps
+### 6. Live Mission Control Dashboard
 
-Clone or download this repository into a local directory:
-git clone [https://github.com/talha436dev/Lunanet-3D-Simulator](https://github.com/yourusername/LunaNet-3D-Simulator.git)
+- Per-node buffer occupancy gauges with colour-coded saturation alerts (green → red)
+- Bundle delivery analytics: packets generated / delivered / dropped with Packet Delivery Ratio (PDR)
+- Full route trace for every delivered bundle: `R-1 → BASE-1 → L1 → GEO-ALPHA → GS-PAKISTAN`
+- Rover telemetry readout: temperature (°C), radiation (mSv), power (%)
+- Satellite status table: orbit angle, mesh link status, contact prediction
 
-Navigate to the folder and open welcome.html directly in your web browser (or use a lightweight IDE extension like VS Code's Live Server).
+---
 
-To customize default positions, coordinate frames, or node properties, modify the JavaScript files inside the respective configuration files.
+## Architecture
 
-# How to Use & Simulation Interaction Guide
-Once the Mission Control HUD loads in your browser, use the following control workflows to interact with and analyze the network:
+Three decoupled simulation layers:
 
-1. Viewport Navigation
-Camera Focus Toggles: Use the left control HUD panel to click "Focus Earth" or "Focus Moon". The camera tracking matrix will instantly shift its target center point across cislunar space.
+| Layer | Responsibility | Files |
+|---|---|---|
+| Spatial Astrodynamics | Orbital positions, coordinate frames, WebGL rendering | `lunarSatellites.js`, `earthSatellites.js`, `groundStation.js` |
+| Physical LOS | Ray-traced link state verification, occlusion masking | `lunanetNetwork.js` |
+| Discrete Protocol | DTN store-and-forward, priority queues, CGR routing | `lunanetNetwork.js`, `index.html` |
 
-3D Manipulation: Use left-click and drag to rotate the orbital perspective, right-click and drag to pan, and the scroll wheel to zoom into specific satellite paths.
+```
+├── welcome.html          # Splash screen & entry point
+├── index.html            # Core interface: DOM, WebGL context, DTN engine, HUD
+├── lunanetNetwork.js     # Protocol layer: LOS math, DTN stack, CGR, routing rules, dashboard
+├── earthSatellites.js    # GEO gateway positions and orbital parameters
+├── lunarSatellites.js    # Cislunar constellation orbital elements (HALO, DRO)
+├── groundStation.js      # Pakistan ground station geographic coordinates
+└── lunarSurface.js       # Surface base deployment, rover patrol logic, telemetry generation
+```
 
-2. On-the-Fly Mesh Network Modification
-Dynamic Node Deployment: Click the + Add Moon Base option button on the dashboard interface.
-<p align="center">
-  <img src="simulation_gif2.gif" alt="LunaNet Fault Injection Simulation Demo" width="750">
-</p>
-Surface Placement: Move your cursor over the 3D rendering of the Moon and left-click on any surface location. The simulation will instantly instantiate a new ground asset, link it into the live topological array, and dynamically include it in routing calculations.
+---
 
-3. Stress Testing via Chaos Injection
-Simulate Environmental Hazards: Locate the Chaos Subsystem panel on the dashboard. Turn on the "Solar Flare" switch to instantly inject a 40% connection drop probability. You will see link vector indicators flash and adapt to data drop rates.
+## Quick Start
 
-Relay Blackouts: Select an operational relay node (e.g., HALO-L1 or DRO Satellite) from the network list and trigger a blackout. The simulator drops its links to test if the bundle traffic falls back smoothly onto remaining paths.
+No compiler, bundler, or backend required. Runs entirely in the browser.
 
-4. Live Protocol & Buffer Tracking
-Queue Saturation Monitoring: Keep an eye on the horizontal bar gauges displayed next to each active node on the HUD display. These map the internal 5-packet queue limits (MAX_BUFFER_CAPACITY=5).
+**Prerequisites:** Any modern browser with WebGL support (Chrome, Edge, Firefox, Safari).
 
-Eviction Behavior Observation: When a network pathway drops, watch the queue fill up. Once the limit is breached, the dashboard flashes from Green to Red, showcasing active Class of Service (CoS) queue preemption rules as lower-priority bulk data is dropped to ensure critical command lines survive.
+```bash
+# Clone the repository
+git clone https://github.com/talha436dev/Lunanet-3D-Simulator.git
 
-🔮 Engineering Future Extensions
-Hardware-in-the-Loop (HIL) Emulation: Integrating microcontroller development boards (e.g., STM32 or ESP32) via WebSockets to serve as physical transceivers, validating true memory limitations and queue timing constraints on real hardware.
+# Open welcome.html in your browser
+# Recommended: VS Code + Live Server extension
+```
 
-Full-Scale Protocol Stack Virtualization: Replacing internal JavaScript queues with a backend running NASA’s reference Interplanetary Overlay Network (ION) software stack, turning the 3D environment into a visual interface for actual spacecraft flight software.
+Or open the **[Live Demo](https://talha436dev.github.io/Lunanet-3D-Simulator/)** — no installation needed.
 
-Mechanical Antenna Gimbal Tracking: Integrating closed-loop Proportional-Integral-Derivative (PID) controllers to model physical antenna steering adjustments on surface rovers, requiring real orientation alignment before links establish.
+---
 
-Compliance Note: Architecture rules and data layers are mapped in accordance with specifications detailed in the NASA LunaNet Architecture Definition Document (ADD) and CCSDS Delay-Tolerant Networking Core Standards.
+## How to Use
+
+### Viewport Navigation
+- **Left-click + drag** → Rotate orbital view
+- **Right-click + drag** → Pan across cislunar space
+- **Scroll wheel** → Zoom into satellite paths
+- **Location dropdown** → Jump camera to Deep Space / Earth / Moon views
+
+### Deploy a Surface Base
+1. Click **`+ Add Moon Base`** in the left panel
+2. Move cursor over the 3D Moon and left-click any surface point
+3. A command base + 3 autonomous rovers deploy instantly, link into the orbital mesh, and begin generating telemetry bundles
+
+### Switch Routing Algorithm
+Use the **Routing Engine** dropdown to toggle between Greedy and CGR modes live — watch the bundle routing paths change in real time on the dashboard.
+
+### Stress Test the Network
+- Enable **Solar Flare** → 40% packet loss injected across all links
+- Enable **Hardware Blackout** → all HALO/DRO relays go dark; watch bundles queue and wait
+
+### Read the Dashboard
+- **Double-click** the Pakistan Ground Station (yellow dot) to open/close Mission Control
+- Watch buffer bars fill as links drop
+- Track delivered bundles with full hop-by-hop route histories and timestamps
+
+---
+
+## Planned Extensions (FYP Research Track)
+
+- **Propagation Delay Modeling** — Realistic 1.3-second Earth-Moon light-speed delay with bundle queuing during blackout windows
+- **Dynamic Contact Schedule Generation** — Auto-generate CGR contact plans from real ephemeris data instead of a hardcoded plan
+- **NASA ION Backend Integration** — Replace JavaScript DTN queues with NASA's reference Interplanetary Overlay Network (ION) software, making this 3D viewer a front-end for actual spacecraft flight software
+- **Hardware-in-the-Loop (HIL)** — STM32/ESP32 microcontrollers via WebSockets as physical DTN transceivers, validating real memory and timing constraints on embedded hardware
+- **ESA Moonlight ELFO Orbit Geometries** — Add Elliptical Lunar Frozen Orbit node positions for ESA Moonlight interoperability alignment
+- **Antenna Gimbal PID Tracking** — Closed-loop orientation controllers requiring real alignment before links establish
+
+---
+
+## Standards & References
+
+| Document | Reference |
+|---|---|
+| NASA LunaNet Architecture Definition Document | NASA/TM–20210019864 |
+| DTN Bundle Protocol Version 7 | RFC 9171 (IETF, 2022) |
+| DTN Bundle Protocol Version 6 (original framework) | RFC 5050 (IETF, 2007) |
+| CCSDS Bundle Protocol Specification | CCSDS 734.2-B-1 |
+| CesiumJS Geospatial 3D Platform | cesium.com |
+
+---
+
+## About the Author
+
+**Syed Talha Jamal**  
+Computer Engineering Student — 6th Semester  
+University of Engineering & Technology (UET), Karachi, Pakistan  
+
+Affiliated with the **EU Centre of Excellence for Climate Action & Environmental Informatics**  
+*(Erasmus+ ACTIVE Programme — European Commission)*
+
+This project was built independently as a self-initiated exploration of cislunar networking standards, motivated by NASA's Artemis programme and the emerging field of interplanetary DTN. It is being extended as a Final Year Project toward research-grade simulation tools for the LunaNet and ESA Moonlight programmes.
+
+📧 `[your email]`  
+🔗 `[LinkedIn URL]`  
+🌐 [Live Demo](https://talha436dev.github.io/Lunanet-3D-Simulator/)

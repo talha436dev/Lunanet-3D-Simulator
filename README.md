@@ -165,7 +165,7 @@ Use the **Routing Engine** dropdown to toggle between Greedy and CGR modes live 
 
 ---
 
-## Planned Extensions (FYP Research Track)
+## Planned Extensions 
 
 - **Propagation Delay Modeling** — Realistic 1.3-second Earth-Moon light-speed delay with bundle queuing during blackout windows
 - **Dynamic Contact Schedule Generation** — Auto-generate CGR contact plans from real ephemeris data instead of a hardcoded plan
@@ -192,13 +192,10 @@ Use the **Routing Engine** dropdown to toggle between Greedy and CGR modes live 
 
 **Syed Talha Jamal**  
 Computer Engineering Student — 6th Semester  
-University of Engineering & Technology (UET), Karachi, Pakistan  
-
-Affiliated with the **EU Centre of Excellence for Climate Action & Environmental Informatics**  
-*(Erasmus+ ACTIVE Programme — European Commission)*
+Sir Syed University of Engineering & Technology (SSUET), Karachi, Pakistan  
 
 This project was built independently as a self-initiated exploration of cislunar networking standards, motivated by NASA's Artemis programme and the emerging field of interplanetary DTN. It is being extended as a Final Year Project toward research-grade simulation tools for the LunaNet and ESA Moonlight programmes.
 
-📧 `[your email]`  
-🔗 `[LinkedIn URL]`  
+📧 `s.talhajamal06@gmail.com`  
+🔗 `www.linkedin.com/in/syed-talha-jamal-901622391`  
 🌐 [Live Demo](https://talha436dev.github.io/Lunanet-3D-Simulator/)
